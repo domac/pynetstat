@@ -125,9 +125,15 @@ def init_iptables():
 
 def set_redis(recv, send):
     Logger.logger.info("recv= %d Kbit/s, send= %d Kbit/s" % (recv, send))
-    ret = {"in_kbits": recv, "out_kbits": send, "timestamp": int(time.time())}
-    json_ret = json.dumps(ret)
-    redis_client.set(redis_key, json_ret)
+
+    if redis_client:
+        ret = {
+            "in_kbits": recv,
+            "out_kbits": send,
+            "timestamp": int(time.time())
+        }
+        json_ret = json.dumps(ret)
+        redis_client.set(redis_key, json_ret)
 
 
 def main():

@@ -8,6 +8,8 @@ import time
 from common.daemon import Daemon
 from common.logger import Logger
 import commands
+import redis
+import json
 
 #增加统计 iptables -A INPUT -p tcp --dport 28080   |  移除统计：iptables -D INPUT -p tcp --dport 28080
 #增加统计 iptables -A INPUT -p tcp --sport 28080   |  移除统计：iptables -D INPUT -p tcp --sport 28080
@@ -15,6 +17,11 @@ import commands
 #-------- 配置 ---------#
 interval_second = 1
 port_list = ["8081", "28080", "28180", "443", "80", "38080"]
+redis_ip = "127.0.0.1"
+redis_port = "6379"
+redis_password = ""
+redis_db = 0
+redis_key = "connsc:flow"
 
 # ---------------------#
 flow_counter = {}
@@ -26,6 +33,14 @@ for port in port_list:
 
 if interval_second <= 0:
     interval_second = 1
+
+redis_client = None
+
+if redis_ip != "" and redis_port != "":
+    print "start redis sync"
+    pool = redis.ConnectionPool(
+        host=redis_ip, port=redis_port, db=redis_db, password=redis_password)
+    redis_client = redis.StrictRedis(connection_pool=pool)
 
 
 def execute_port_flow():
@@ -46,9 +61,10 @@ def execute_port_flow():
     for port, res in result.items():
         sub = "%s = %d Kbit/s\t" % (port, res)
         output += sub
-    output += "all = %d Kbit/s" % total
 
     Logger.logger.info(output)
+
+    return total
 
 
 def execute_sport_flow():
@@ -70,9 +86,10 @@ def execute_sport_flow():
         #sub = "<%s:%dKb>\t" % (port, res)
         sub = "%s = %d Kbit/s\t" % (port, res)
         output += sub
-    output += "all = %d Kbit/s" % total
 
     Logger.logger.info(output)
+
+    return total
 
 
 sub_counter = {"all": 0, "tcp": 0, "udp": 0, "icmp": 0}
@@ -106,13 +123,21 @@ def init_iptables():
         commands.getstatusoutput(scmd2)
 
 
+def set_redis(recv, send):
+    Logger.logger.info("recv= %d Kbit/s, send= %d Kbit/s" % (recv, send))
+    ret = {"in_kbits": recv, "out_kbits": send, "timestamp": int(time.time())}
+    json_ret = json.dumps(ret)
+    redis_client.set(redis_key, json_ret)
+
+
 def main():
 
     init_iptables()
 
     while True:
-        execute_port_flow()
-        execute_sport_flow()
+        recv = execute_port_flow()
+        send = execute_sport_flow()
+        set_redis(recv, send)
         execute_netstat()
         time.sleep(interval_second)
         commands.getstatusoutput("echo '' >> /data/logs/pynetstat/stdout.log")

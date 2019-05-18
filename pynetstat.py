@@ -12,11 +12,11 @@ import commands
 #增加统计 iptables -A INPUT -p tcp --dport 28080   |  移除统计：iptables -D INPUT -p tcp --dport 28080
 #增加统计 iptables -A INPUT -p tcp --sport 28080   |  移除统计：iptables -D INPUT -p tcp --sport 28080
 
-#统计间隔
-interval_second = 10
-
+#-------- 配置 ---------#
+interval_second = 1
 port_list = ["8081", "28080", "28180", "443", "80", "38080"]
 
+# ---------------------#
 flow_counter = {}
 sflow_counter = {}
 
@@ -24,9 +24,13 @@ for port in port_list:
     flow_counter[port] = 0
     sflow_counter[port] = 0
 
+if interval_second <= 0:
+    interval_second = 1
+
 
 def execute_port_flow():
     result = {}
+    total = 0
     for port, old_counter in flow_counter.items():
         cmd = "iptables -L -v -n -x | grep 'tcp dpt:%s' | awk '{print $2}' | head -n 1" % port
         code, output = commands.getstatusoutput(cmd)
@@ -35,20 +39,21 @@ def execute_port_flow():
         new_counter = int(str(output))
         counter = new_counter - old_counter
         flow_counter[port] = new_counter
-        #if counter == new_counter:
-        #continue
         result[port] = 8 * counter / 1024 / interval_second
+        total += result[port]
 
     output = "recv port flow : "
     for port, res in result.items():
-        sub = "%s = %dKb\t" % (port, res)
+        sub = "%s = %d Kbit/s\t" % (port, res)
         output += sub
+    output += "all = %d Kbit/s" % total
 
     Logger.logger.info(output)
 
 
 def execute_sport_flow():
     result = {}
+    total = 0
     for port, old_counter in sflow_counter.items():
         cmd = "iptables -L -v -n -x | grep 'tcp spt:%s' | awk '{print $2}' | head -n 1" % port
         code, output = commands.getstatusoutput(cmd)
@@ -57,15 +62,15 @@ def execute_sport_flow():
         new_counter = int(str(output))
         counter = new_counter - old_counter
         sflow_counter[port] = new_counter
-        #if counter == new_counter:
-        #continue
         result[port] = 8 * counter / 1024 / interval_second
+        total += result[port]
 
     output = "send port flow : "
     for port, res in result.items():
         #sub = "<%s:%dKb>\t" % (port, res)
-        sub = "%s = %dKb\t" % (port, res)
+        sub = "%s = %d Kbit/s\t" % (port, res)
         output += sub
+    output += "all = %d Kbit/s" % total
 
     Logger.logger.info(output)
 

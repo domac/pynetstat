@@ -38,9 +38,15 @@ redis_client = None
 
 if redis_ip != "" and redis_port != "":
     print "start redis sync"
-    pool = redis.ConnectionPool(
-        host=redis_ip, port=redis_port, db=redis_db, password=redis_password)
-    redis_client = redis.StrictRedis(connection_pool=pool)
+    try:
+        pool = redis.ConnectionPool(
+            host=redis_ip,
+            port=redis_port,
+            db=redis_db,
+            password=redis_password)
+        redis_client = redis.StrictRedis(connection_pool=pool)
+    except Exception, e:
+        Logger.logger.error(e)
 
 
 def execute_port_flow():

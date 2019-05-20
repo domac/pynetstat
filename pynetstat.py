@@ -17,11 +17,12 @@ import json
 #-------- 配置 ---------#
 interval_second = 1
 port_list = ["8081", "28080", "28180", "443", "80", "38080"]
+redis_open = 0
 redis_ip = "127.0.0.1"
 redis_port = "6379"
 redis_password = ""
 redis_db = 0
-redis_key = "connsc:flow"
+redis_key = "netflow:root"
 
 # ---------------------#
 flow_counter = {}
@@ -60,12 +61,12 @@ def execute_port_flow():
         new_counter = int(str(output))
         counter = new_counter - old_counter
         flow_counter[port] = new_counter
-        result[port] = 8 * counter / 1024 / interval_second
+        result[port] = counter / interval_second
         total += result[port]
 
     output = "recv port flow : "
     for port, res in result.items():
-        sub = "%s = %d Kbit/s\t" % (port, res)
+        sub = "%s = %d B/s\t" % (port, res)
         output += sub
 
     Logger.logger.info(output)
@@ -84,13 +85,12 @@ def execute_sport_flow():
         new_counter = int(str(output))
         counter = new_counter - old_counter
         sflow_counter[port] = new_counter
-        result[port] = 8 * counter / 1024 / interval_second
+        result[port] = counter / interval_second
         total += result[port]
 
     output = "send port flow : "
     for port, res in result.items():
-        #sub = "<%s:%dKb>\t" % (port, res)
-        sub = "%s = %d Kbit/s\t" % (port, res)
+        sub = "%s = %d B/s\t" % (port, res)
         output += sub
 
     Logger.logger.info(output)
@@ -130,16 +130,18 @@ def init_iptables():
 
 
 def set_redis(recv, send):
-    Logger.logger.info("recv= %d Kbit/s, send= %d Kbit/s" % (recv, send))
-
-    if redis_client:
+    if redis_client and redis_open == 1:
+        Logger.logger.info(
+            "(sync redis) recv= %d B/s, send= %d B/s" % (recv, send))
         ret = {
-            "in_kbits": recv,
-            "out_kbits": send,
+            "in_Bytes": recv,
+            "out_Bytes": send,
             "timestamp": int(time.time())
         }
         json_ret = json.dumps(ret)
         redis_client.set(redis_key, json_ret)
+    else:
+        Logger.logger.info("recv= %d B/s, send= %d B/s" % (recv, send))
 
 
 def main():

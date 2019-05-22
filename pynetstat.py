@@ -123,9 +123,14 @@ def init_iptables():
         scmd = "iptables -D INPUT -p tcp --sport %s" % port
         commands.getstatusoutput(scmd)
 
+        dcmd1 = "iptables -D OUTPUT -p tcp --dport %s" % port
+        commands.getstatusoutput(dcmd1)
+        scmd1 = "iptables -D OUTPUT -p tcp --sport %s" % port
+        commands.getstatusoutput(scmd1)
+
         dcmd2 = "iptables -A INPUT -p tcp --dport %s" % port
         commands.getstatusoutput(dcmd2)
-        scmd2 = "iptables -A INPUT -p tcp --sport %s" % port
+        scmd2 = "iptables -A OUTPUT -p tcp --sport %s" % port
         commands.getstatusoutput(scmd2)
 
 
